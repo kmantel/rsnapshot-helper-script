@@ -23,7 +23,8 @@ Options:
 test=""
 config=""
 
-while getopts "htc:" opt; do
+extra_args=()
+while getopts ":htc:" opt; do
   case $opt in
     t)
         test="-t"
@@ -41,14 +42,10 @@ while getopts "htc:" opt; do
         exit 1
         ;;
     \?)
-        echo "Invalid option -$OPTARG" >&2
-        echo "$USAGE"
-        exit 1
+        extra_args+=("-${OPTARG}")
         ;;
   esac
 done
-
-shift $((OPTIND-1))
 
 
 # Timers are stored in $SPOOL/next.${BACKUP_LEVEL}
@@ -65,8 +62,6 @@ function spool_file {
         echo "$SPOOL/next.$conf.$interval"
 }
 
-spool_file daily
-spool_file daily $config
 
 # check_and_repair $BACKUP_LEVEL:
 #    $BACKUP_LEVEL: Name of the backup level
@@ -102,9 +97,8 @@ function check_and_repair {
 function run {
         check_and_repair $1
         spoolfi=$(spool_file "$1" "$config")
-        echo ${@:3}
         if [[ "$(/bin/cat $spoolfi)" -le "$(/bin/date +%s)" ]]; then
-                rsnapshot $1 ${@:3}
+                rsnapshot $test ${config:+-c $config} "${@:3}" "$1"
                 if (( ! $? )) && [[ -z "$test" ]]; then
                         echo $(($(/bin/date +%s) + $2)) > "$spoolfi"
                 fi
@@ -114,8 +108,8 @@ function run {
 # Run daily, weekly, monthly and yearly updates. Run higher
 # backup levels first as higher backup-levels are just 
 # copied from lower backup levels
-run yearly  29030400 "$@"
-run monthly 2419200 "$@"
-run weekly  604800 "$@"
-run daily   86400 "$@"
-run hourly  3600 "$@"
+run yearly  29030400 "${extra_args[@]}"
+run monthly 2419200 "${extra_args[@]}"
+run weekly  604800 "${extra_args[@]}"
+run daily   86400 "${extra_args[@]}"
+run hourly  3600 "${extra_args[@]}"
